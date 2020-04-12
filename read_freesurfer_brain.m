@@ -1,4 +1,4 @@
-function brain_data = read_freesurfer_brain( fs_subject_dir, fs_dir )
+function [brain_data, vertex_data] = read_freesurfer_brain( fs_subject_dir, fs_dir )
 % READ_FREESURFER_BRAIN encapsulates FreeSurfer's shell and Matlab
 % functions to read pial and inflated cortical surfaces into Matlab as a
 % mesh object (after an anatomical scan has been fully processed by 
@@ -26,9 +26,19 @@ function brain_data = read_freesurfer_brain( fs_subject_dir, fs_dir )
 % Written by Edden M. Gerber, Hebrew University of Jerusalem 2015, 
 % edden.gerber@gmail.com
 %
+% Tamar Regev April 2020: Added vertex_data as in run_fsfast.m from fmri_analysis_pipeline_with_freesurfer
+
+
+% Example inputs (Tamar)
+% fs_subject_dir = '/mindhive/evlab/u/tamarr/Projects/freesurfer/subjects/bert';
+
+% For debugging (Tamar)
+% load demo_data
+% brain_data_demo=brain_data;
+% vertex_data_demo = vertex_data;
 
 % Handle optional input
-DEFAULT_FS_DIR = '/usr/local/freesurfer'; % It's recommended to change this to the FS directory on your machine.
+DEFAULT_FS_DIR = '/cm/shared/openmind/freesurfer/5.3.0/'; % It's recommended to change this to the FS directory on your machine.
 
 if nargin < 2 || isempty(fs_dir)
     fs_dir = DEFAULT_FS_DIR;
@@ -80,5 +90,45 @@ brain_data.inflated_left.vertices = transformations.ijk2xyz.transformPointsForwa
 % Pull apart the two inflated hemispheres so they do not overlap if plotted together (originally they are both placed in the center of the coordinate space:
 [brain_data.inflated_left, brain_data.inflated_right] = pull_apart_inflated_hemispheres(brain_data.inflated_left, brain_data.inflated_right, 10);
 
+%Tamar: new from here:
+
+vertex_data = struct;
+
+% Read curvature
+curv_lh = read_curv(fullfile(fs_subject_dir,'surf','lh.curv'));
+curv_rh = read_curv(fullfile(fs_subject_dir,'surf','rh.curv'));
+vertex_data.left.vertex_curvature_index = curv_lh;
+vertex_data.right.vertex_curvature_index = curv_rh;
+
+% Read thickness
+thick_lh = read_curv(fullfile(fs_subject_dir,'surf','lh.thickness'));
+thick_rh = read_curv(fullfile(fs_subject_dir,'surf','rh.curv'));
+vertex_data.left.vertex_thickness_index = thick_lh;
+vertex_data.right.vertex_thickness_index = thick_rh;
+
+% Read parcellation
+vertex_data.left.auto_parcellation.data(1:size(brain_data.pial_left.vertices,1),1) = nan;
+vertex_data.right.auto_parcellation.data(1:size(brain_data.pial_right.vertices,1),1) = nan;
+% Left
+[vertices,label,colortable]=read_annotation(fullfile(fs_subject_dir,'label','lh.aparc.a2009s.annot'));
+for p = 1:colortable.numEntries
+    v_idx = find(label == colortable.table(p,5));
+    vertex_data.left.auto_parcellation.data(v_idx) = p;
+end
+vertex_data.left.auto_parcellation.labels = colortable.struct_names;
+
+% Right
+[vertices,label,colortable]=read_annotation(fullfile(fs_subject_dir,'label','rh.aparc.a2009s.annot'));
+for p = 1:colortable.numEntries
+    v_idx = find(label == colortable.table(p,5));
+    vertex_data.right.auto_parcellation.data(v_idx) = p;
+end
+%TODO: does data equal to code?
+%figure;plot(vertex_data.left.auto_parcellation.data)
+%hold all;plot(vertex_data_demo.left.auto_parcellation.code)
+
+vertex_data.right.auto_parcellation.labels = colortable.struct_names;
+%TODO - does labels equal to lookup_table.name ?
+% TODO extract rgb from colortable.table?
 end
 
