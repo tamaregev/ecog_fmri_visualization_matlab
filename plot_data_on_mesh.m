@@ -71,6 +71,10 @@ function plot_data_on_mesh( coordinates, varargin )
 % PLOT_DATA_ON_MESH(...,'shownumbers') will add number labels which will
 %   float next to the plotted data (e.g. plotted coordinates will be
 %   labeled as 1,2,3...). 
+% Added by Gal Vishne 16/04/2020:
+% PLOT_DATA_ON_MESH(...,'handle',h) - h is a mesh handle where you want to
+%   plot the data (from plot_mesh_brain), otherwise data will be plotted on
+%   recently plotted mesh.
 %
 % Written by Edden M. Gerber, Hebrew University of Jerusalem 2015,  
 % edden.gerber@gmail.com
@@ -82,22 +86,6 @@ DEFAULT_PATCH_SIZE = 3;
 DEFAULT_OVERLAP_METHOD = 'max';
 DEFAULT_TRANSPARENCY = 0;
 
-% Handle mandatory input
-ignore_coord = isnan(coordinates(:,1));
-xyz_coord = true;
-if size(coordinates,2) == 1 % a vector of mesh vertices instead of 3D coordinates
-    h_mesh = findobj(gcf,'Type','Patch');
-    if isempty(h_mesh)
-        error('No patch object found in the current figure (i.e. no brain plotted).');
-    end
-    mesh_vert = h_mesh.Vertices;
-    vert_idx = coordinates;
-    coordinates = mesh_vert(vert_idx(~ignore_coord),:);
-    xyz_coord = false;
-elseif size(coordinates,2) ~= 3
-    error('ERROR: coordinates argument should be a nx3 or a nx1 matrix (3D coordinates or mesh vertex list)');
-end
-
 % Handle optional input
 method = DEFAULT_PLOT_METHOD; % default
 marker_size = DEFAULT_MARKER_SIZE; % default
@@ -108,6 +96,7 @@ scatter_color_values = DEFAULT_MARKER_COLOR; % default
 surface_color_values = ones(size(coordinates,1),1); % default
 transparency_value = DEFAULT_TRANSPARENCY;
 color_map = colormap;
+h_mesh = findobj(gcf,'Type','Patch');
 scatter_arg = {};
 narg = size(varargin,2);
 arg = 1;
@@ -175,6 +164,9 @@ while arg <= narg
             case 'shownumbers'
                 show_numbers = true;
                 arg = arg + 1;
+            case 'handle'
+                h_mesh = varargin{arg+1};
+                arg = arg + 2;
             otherwise
                 if length(varargin{arg}) == 1 % single letter indicates color code
                     scatter_color_values = varargin{arg};
@@ -198,6 +190,21 @@ while arg <= narg
     end
 end
 
+% Handle mandatory input
+ignore_coord = isnan(coordinates(:,1));
+xyz_coord = true;
+if size(coordinates,2) == 1 % a vector of mesh vertices instead of 3D coordinates
+    if isempty(h_mesh)
+        error('No patch object found in the current figure (i.e. no brain plotted).');
+    end
+    mesh_vert = h_mesh.Vertices;
+    vert_idx = coordinates;
+    coordinates = mesh_vert(vert_idx(~ignore_coord),:);
+    xyz_coord = false;
+elseif size(coordinates,2) ~= 3
+    error('ERROR: coordinates argument should be a nx3 or a nx1 matrix (3D coordinates or mesh vertex list)');
+end
+
 switch method
     case 'scatter'
         % 3-D scatter plot of electrode coordinates
@@ -206,7 +213,6 @@ switch method
     case 'surface'
         % First find the mesh data object if we haven't yet
         if ~exist('mesh_vert','var')
-            h_mesh = findobj(gcf,'Type','Patch');
             if isempty(h_mesh)
                 error('No patch object found in the current figure (i.e. no brain plotted).');
             end
@@ -258,9 +264,9 @@ switch method
         transparency_map = ones(length(vertex_color_values),1);
         transparency_map(vertex_color_values ~= 0) = transparency_value;
         
-        paint_mesh(vertex_color_values', transparency_map);
+        paint_mesh(vertex_color_values', transparency_map, true, h_mesh);
         colormap(color_map);
-        set(gca,'CLim',[0 max(vertex_color_values)]);
+        set(gca,'CLim',[min(vertex_color_values) max(vertex_color_values)]);
 end
 
 % Plot coordinate number labels
