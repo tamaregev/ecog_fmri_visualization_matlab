@@ -106,7 +106,7 @@ colormap hot
 
 %% The same activity map on the non-inflated brain
 figure;
-plot_mesh_brain(brain_data.pial_right,[-50 0]); 
+plot_mesh_brain(brain_data.pial_right,[50 0]); 
 paint_mesh(fmri_data,0.3);
 caxis([0 40]);
 colormap hot
